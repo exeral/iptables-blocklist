@@ -1,0 +1,41 @@
+#!/bin/bash
+
+#DEBUG=1
+
+# Do we already have the file?
+if [ -e /tmp/ipBlockList ]; then
+	local_md5=$(md5sum /tmp/ipBlockList | awk '{print $1}')
+	if [ $DEBUG ]; then echo "local_md5: $local_md5"; fi
+else
+	local_md5=0
+	if [ $DEBUG ]; then echo "blocklist file not found"; fi
+fi
+
+# remote checksum
+real_md5=$(curl --silent https://lists.blocklist.de/lists/all.txt.md5)
+if [ $DEBUG ]; then echo "real_md5: $real_md5"; fi
+
+# updating file if needed
+if [ "$local_md5" != "$real_md5" ]
+then
+	if [ $DEBUG ]; then echo "!= md5, downloading new blocklist"; fi
+	# prevent other users to modify the blocklist
+	umask 077
+	# getting blocklist
+	wget --quiet https://lists.blocklist.de/lists/all.txt --output-document=/tmp/ipBlockList
+	local_md5=$(md5sum /tmp/ipBlockList | awk '{print $1}')
+fi
+
+if [ "$local_md5" == "$real_md5" ]
+then
+	if [ $DEBUG ]; then echo "== md5, adding to ipset"; fi
+	# delete ipv6 IPs
+	sed -i '/:/d' /tmp/ipBlockList
+	ipset flush
+	if [ $DEBUG ]; then echo "ipset flushed"; fi
+	# add IPs to the set
+	while read ip;
+	do
+		ipset add BlockAddress $ip || echo $ip
+	done < /tmp/ipBlockList
+fi
