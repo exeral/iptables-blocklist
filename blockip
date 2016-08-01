@@ -2,6 +2,8 @@
 
 #DEBUG=1
 
+if [ ! `which ipset` ]; then echo "ipset required" && exit 1; fi
+
 # Do we already have the file?
 if [ -e /tmp/ipBlockList ]; then
 	local_md5=$(md5sum /tmp/ipBlockList | awk '{print $1}')
